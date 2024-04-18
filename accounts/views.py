@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
+from django.http import JsonResponse
 from .serializers import UserSerializer
 User = get_user_model()
 
@@ -11,6 +12,8 @@ class CustomUserCreate(generics.CreateAPIView):
     permission_classes = (permissions.AllowAny,)
     serializer_class = UserSerializer
 
+from django.contrib.auth import authenticate
+
 class CustomUserLogin(APIView):
     permission_classes = (permissions.AllowAny,)
 
@@ -18,17 +21,23 @@ class CustomUserLogin(APIView):
         username = request.data.get('username')
         password = request.data.get('password')
 
-        user = User.objects.filter(username=username).first()
+        user = authenticate(username=username, password=password)
 
-        if user is None or not user.check_password(password):
+        if user is None:
             return Response({'error': 'Invalid username or password'}, status=status.HTTP_400_BAD_REQUEST)
 
-        refresh = RefreshToken.for_user(user)
+        if not user.is_superuser:
+            return Response({'error': 'You do not have permission to log in'}, status=status.HTTP_403_FORBIDDEN)
 
-        return Response({
-            'refresh': str(refresh),
+        refresh = RefreshToken.for_user(user)
+        response = JsonResponse({
+            'refffffffresh': str(refresh),
             'access': str(refresh.access_token),
         })
+        response.set_cookie('refffffffresh', str(refresh))
+        response.set_cookie('access', str(refresh.access_token))
+        return response
+
 
 class CustomUserLogout(APIView):
     def post(self, request, *args, **kwargs):
